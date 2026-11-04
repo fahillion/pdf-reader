@@ -68,3 +68,18 @@ Set-Content -Path $rsp -Value $lines -Encoding ASCII
 & "$fx\csc.exe" "@$rsp"
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 Write-Output "Built $here\PdfReader.exe"
+
+# The installer carries the app inside it, so it's one file to copy to another PC.
+$dist = "$here\dist"
+New-Item -ItemType Directory -Force $dist | Out-Null
+$setupRsp = Join-Path $env:TEMP 'pdfreader-setup.rsp'
+$setupLines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimize+',
+    "/win32manifest:`"$here\setup.manifest`"", "/win32icon:`"$ico`"", "/out:`"$dist\PDFReaderSetup.exe`"",
+    "/resource:`"$here\PdfReader.exe`",PdfReader.exe", "/resource:`"$here\Theme.xaml`",Theme.xaml",
+    "/r:`"$fx\mscorlib.dll`"")
+$setupLines += $refs | ForEach-Object { "/r:`"$_`"" }
+$setupLines += "`"$here\Setup.cs`""
+Set-Content -Path $setupRsp -Value $setupLines -Encoding ASCII
+& "$fx\csc.exe" "@$setupRsp"
+if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
+Write-Output "Built $dist\PDFReaderSetup.exe"
