@@ -1,0 +1,3 @@
+# Built output; rebuild with build.ps1
+*.exe
+dist/
