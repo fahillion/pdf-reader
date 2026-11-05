@@ -72,9 +72,13 @@ Write-Output "Built $here\PdfReader.exe"
 # The installer carries the app inside it, so it's one file to copy to another PC.
 $dist = "$here\dist"
 New-Item -ItemType Directory -Force $dist | Out-Null
+# The file name carries the version from Setup.cs, for example PDFReaderSetup-1.1.0.exe.
+$version = [regex]::Match((Get-Content "$here\Setup.cs" -Raw), 'public const string Version = "([0-9.]+)"').Groups[1].Value
+if (-not $version) { throw "Couldn't read the version from Setup.cs" }
+$setupExe = "$dist\PDFReaderSetup-$version.exe"
 $setupRsp = Join-Path $env:TEMP 'pdfreader-setup.rsp'
 $setupLines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimize+',
-    "/win32manifest:`"$here\setup.manifest`"", "/win32icon:`"$ico`"", "/out:`"$dist\PDFReaderSetup.exe`"",
+    "/win32manifest:`"$here\setup.manifest`"", "/win32icon:`"$ico`"", "/out:`"$setupExe`"",
     "/resource:`"$here\PdfReader.exe`",PdfReader.exe", "/resource:`"$here\Theme.xaml`",Theme.xaml",
     "/r:`"$fx\mscorlib.dll`"")
 $setupLines += $refs | ForEach-Object { "/r:`"$_`"" }
@@ -82,4 +86,4 @@ $setupLines += "`"$here\Setup.cs`""
 Set-Content -Path $setupRsp -Value $setupLines -Encoding ASCII
 & "$fx\csc.exe" "@$setupRsp"
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
-Write-Output "Built $dist\PDFReaderSetup.exe"
+Write-Output "Built $setupExe"

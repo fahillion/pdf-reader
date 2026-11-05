@@ -1,7 +1,7 @@
 // PDF Reader's installer and uninstaller. Installs for the current user, so no admin rights are needed.
 // It offers the app for PDFs but never changes the default; Windows leaves that choice to the person.
-//   PDFReaderSetup.exe                 install, with a window
-//   PDFReaderSetup.exe /uninstall      uninstall, with a window
+//   PDFReaderSetup-<version>.exe       install, with a window
+//   PDFReaderSetup-<version>.exe /uninstall  uninstall, with a window
 //   add /silent to either for no window
 using System;
 using System.Diagnostics;
