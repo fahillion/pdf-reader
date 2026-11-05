@@ -80,3 +80,7 @@ This produces `PdfReader.exe` and the installer at `dist\PDFReaderSetup-<version
 ## Built with
 
 C# and WPF on .NET Framework 4.8, plus the Windows.Data.Pdf rendering engine built into Windows. There are no third-party libraries.
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 Nepal Plummer.
