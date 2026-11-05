@@ -21,13 +21,13 @@ using Microsoft.Win32;
 [assembly: TargetFramework(".NETFramework,Version=v4.8")]
 [assembly: AssemblyTitle("PDF Reader Setup")]
 [assembly: AssemblyProduct("PDF Reader")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
 
 namespace PdfReaderSetup
 {
     static class Installer
     {
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
         const string AppName = "PDF Reader";
         const string ProgId = "PdfReader.Document";
         const string SetupName = "Setup.exe";
