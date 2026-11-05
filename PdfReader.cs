@@ -164,7 +164,8 @@ namespace PdfReaderApp
     {
         public const string DefaultOpenAiModel = "gpt-6.1-sol";
 
-        static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfReader");
+        // PDFREADER_TEST_DATA points tests and screenshots at a separate folder, so they never touch real settings.
+        static readonly string Dir = Environment.GetEnvironmentVariable("PDFREADER_TEST_DATA") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PdfReader");
         static readonly string FilePath = Path.Combine(Dir, "settings.json");
         public static readonly string ThumbDir = Path.Combine(Dir, "thumbs");
 
