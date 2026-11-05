@@ -443,6 +443,9 @@ namespace PdfReaderApp
         readonly WrapPanel recentPanel;
         readonly StackPanel chatPanel;
         readonly Image pageImage;
+        readonly System.Windows.Controls.Primitives.ScrollBar pageBar;
+        readonly FrameworkElement pageBadge;
+        readonly TextBlock pageBadgeText;
         readonly TextBlock fileNameText, pageText, zoomText, printText, askHint, sendIcon, privacyNote, statusText, cardTitle, cardBody, cardNote, cardPrimaryText, cardSecondaryText;
         readonly Button prevButton, nextButton, printButton, sendButton, summarizeButton, cardPrimary, cardCoral, cardSecondary, manageButton, signOutButton;
         readonly TextBox askBox;
@@ -460,7 +463,9 @@ namespace PdfReaderApp
         int pageIndex;
         bool fitPage = true;
         double scale = 1.0;
-        bool rendering, renderAgain, scrollToTop, printing;
+        bool rendering, renderAgain, scrollToTop, scrollToBottom, printing, updatingPageBar;
+        double wheelSum;
+        DateTime lastWheelTurn;
 
         readonly List<Turn> turns = new List<Turn>();
         string pdfBase64;
@@ -513,6 +518,9 @@ namespace PdfReaderApp
             recentPanel = Find<WrapPanel>("RecentPanel");
             chatPanel = Find<StackPanel>("ChatPanel");
             pageImage = Find<Image>("PageImage");
+            pageBar = Find<System.Windows.Controls.Primitives.ScrollBar>("PageBar");
+            pageBadge = Find<FrameworkElement>("PageBadge");
+            pageBadgeText = Find<TextBlock>("PageBadgeText");
             fileNameText = Find<TextBlock>("FileNameText");
             pageText = Find<TextBlock>("PageText");
             zoomText = Find<TextBlock>("ZoomText");
@@ -564,6 +572,11 @@ namespace PdfReaderApp
                     ZoomBy(e.Delta > 0 ? ZoomStep : 1 / ZoomStep);
                     e.Handled = true;
                 }
+                else WheelPastEdge(e);
+            };
+            pageBar.ValueChanged += delegate(object s, RoutedPropertyChangedEventArgs<double> e)
+            {
+                if (!updatingPageBar) GoTo((int)Math.Round(e.NewValue));
             };
             // Clicking the page takes focus back from the question box, so the arrows turn pages again.
             pageScroller.PreviewMouseDown += delegate { if (askBox.IsKeyboardFocused) Focus(); };
@@ -618,6 +631,10 @@ namespace PdfReaderApp
             else if (e.Key == Key.Right) { GoTo(pageIndex + 1); e.Handled = true; }
             else if (e.Key == Key.Up) { pageScroller.ScrollToVerticalOffset(pageScroller.VerticalOffset - 60); e.Handled = true; }
             else if (e.Key == Key.Down) { pageScroller.ScrollToVerticalOffset(pageScroller.VerticalOffset + 60); e.Handled = true; }
+            else if (e.Key == Key.PageDown) { GoTo(pageIndex + 1); e.Handled = true; }
+            else if (e.Key == Key.PageUp) { GoTo(pageIndex - 1); e.Handled = true; }
+            else if (e.Key == Key.Home) { GoTo(0); e.Handled = true; }
+            else if (e.Key == Key.End) { GoTo((int)doc.PageCount - 1); e.Handled = true; }
         }
 
         void ChooseFile()
@@ -645,6 +662,7 @@ namespace PdfReaderApp
                 pageIndex = 0;
                 fitPage = true;
                 scrollToTop = true;
+                scrollToBottom = false;
                 ResetChat();
                 homeView.Visibility = Visibility.Collapsed;
                 readerView.Visibility = Visibility.Visible;
@@ -785,12 +803,31 @@ namespace PdfReaderApp
 
         // ---------- Reading ----------
 
-        void GoTo(int index)
+        void GoTo(int index, bool atBottom = false)
         {
             if (doc == null || index < 0 || index >= doc.PageCount || index == pageIndex) return;
             pageIndex = index;
-            scrollToTop = true;
+            scrollToTop = !atBottom;
+            scrollToBottom = atBottom;
+            UpdateReaderUi();   // The count and bar move at once; the page image follows when rendered.
             Render();
+        }
+
+        // Scrolling the wheel past the bottom of a page goes to the next page; past the top, to the previous one.
+        // A short pause between turns keeps a fast or touchpad scroll from skipping several pages.
+        void WheelPastEdge(MouseWheelEventArgs e)
+        {
+            if (doc == null || doc.PageCount < 2) return;
+            bool down = e.Delta < 0;
+            bool atEdge = down ? pageScroller.VerticalOffset >= pageScroller.ScrollableHeight - 0.5 : pageScroller.VerticalOffset <= 0.5;
+            if (!atEdge || (down ? pageIndex >= doc.PageCount - 1 : pageIndex <= 0)) { wheelSum = 0; return; }
+            e.Handled = true;
+            if ((DateTime.UtcNow - lastWheelTurn).TotalMilliseconds < 350) return;
+            wheelSum += e.Delta;
+            if (Math.Abs(wheelSum) < 120) return;
+            wheelSum = 0;
+            lastWheelTurn = DateTime.UtcNow;
+            if (down) GoTo(pageIndex + 1); else GoTo(pageIndex - 1, true);
         }
 
         void ZoomBy(double factor)
@@ -859,6 +896,12 @@ namespace PdfReaderApp
                 pageScroller.ScrollToHome();
                 scrollToTop = false;
             }
+            else if (scrollToBottom)
+            {
+                pageScroller.ScrollToHorizontalOffset(0);
+                pageScroller.ScrollToVerticalOffset(pageScroller.ScrollableHeight);
+                scrollToBottom = false;
+            }
             else if (oldW > 0 && oldH > 0)
             {
                 pageScroller.ScrollToHorizontalOffset(cx * pageImage.Width / oldW - pageScroller.ViewportWidth / 2);
@@ -870,7 +913,18 @@ namespace PdfReaderApp
         void UpdateReaderUi()
         {
             if (doc == null) return;
-            pageText.Text = "Page " + (pageIndex + 1) + " / " + doc.PageCount;
+            int count = (int)doc.PageCount;
+            pageText.Text = "Page " + (pageIndex + 1) + " of " + count;
+            pageBadgeText.Text = (pageIndex + 1) + " of " + count;
+            Visibility multi = count > 1 ? Visibility.Visible : Visibility.Collapsed;
+            pageBar.Visibility = multi;
+            pageBadge.Visibility = multi;
+            updatingPageBar = true;
+            pageBar.Minimum = 0;
+            pageBar.Maximum = Math.Max(0, count - 1);
+            pageBar.ViewportSize = Math.Max(1, (count - 1) / 24.0);   // Keeps the thumb big enough to grab on long PDFs.
+            pageBar.Value = pageIndex;
+            updatingPageBar = false;
             zoomText.Text = (int)Math.Round(scale * 100) + "%";
             prevButton.IsEnabled = pageIndex > 0;
             nextButton.IsEnabled = pageIndex < doc.PageCount - 1;

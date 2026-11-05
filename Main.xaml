@@ -96,15 +96,29 @@
       </Grid>
     </Border>
 
-    <ScrollViewer x:Name='PageScroller' Grid.Row='1' HorizontalScrollBarVisibility='Auto' VerticalScrollBarVisibility='Auto'
-                  Background='{StaticResource PageBg}' Focusable='False'>
-      <Border HorizontalAlignment='Center' VerticalAlignment='Center' Margin='14'>
-        <Border.Effect>
-          <DropShadowEffect BlurRadius='24' ShadowDepth='3' Opacity='0.55' Color='Black'/>
-        </Border.Effect>
-        <Image x:Name='PageImage' RenderOptions.BitmapScalingMode='NearestNeighbor' SnapsToDevicePixels='True'/>
+    <Grid Grid.Row='1' Background='{StaticResource PageBg}'>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width='*'/>
+        <ColumnDefinition Width='Auto'/>
+      </Grid.ColumnDefinitions>
+      <ScrollViewer x:Name='PageScroller' HorizontalScrollBarVisibility='Auto' VerticalScrollBarVisibility='Auto'
+                    Background='{StaticResource PageBg}' Focusable='False'>
+        <Border HorizontalAlignment='Center' VerticalAlignment='Center' Margin='14'>
+          <Border.Effect>
+            <DropShadowEffect BlurRadius='24' ShadowDepth='3' Opacity='0.55' Color='Black'/>
+          </Border.Effect>
+          <Image x:Name='PageImage' RenderOptions.BitmapScalingMode='NearestNeighbor' SnapsToDevicePixels='True'/>
+        </Border>
+      </ScrollViewer>
+      <!-- Page bar: one step per page; the thumb's size shows how much of the document this page is. -->
+      <ScrollBar x:Name='PageBar' Grid.Column='1' Width='14' MinWidth='14' Background='#1C1C1C' SmallChange='1' LargeChange='1'
+                 Visibility='Collapsed' ToolTip='Drag to move between pages' Focusable='False'/>
+      <Border x:Name='PageBadge' HorizontalAlignment='Center' VerticalAlignment='Bottom' Margin='0,0,0,18' Padding='12,5'
+              CornerRadius='12' Background='#D9202020' BorderBrush='{StaticResource Line}' BorderThickness='1'
+              IsHitTestVisible='False' Visibility='Collapsed'>
+        <TextBlock x:Name='PageBadgeText' FontSize='12.5' Foreground='{StaticResource TextMain}'/>
       </Border>
-    </ScrollViewer>
+    </Grid>
 
     <!-- AI panel -->
     <Border x:Name='AiPanel' Grid.Row='1' Grid.Column='1' Width='390' Background='{StaticResource PanelBg}'
