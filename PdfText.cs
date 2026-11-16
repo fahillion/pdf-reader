@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace PdfReaderApp
 {
@@ -31,6 +32,14 @@ namespace PdfReaderApp
         [DllImport(Dll)] public static extern int FPDFText_CountChars(IntPtr textPage);
         [DllImport(Dll)] public static extern uint FPDFText_GetUnicode(IntPtr textPage, int index);
         [DllImport(Dll)] public static extern int FPDFText_GetLooseCharBox(IntPtr textPage, int index, out RectF rect);
+
+        // Drawing pages on the CPU. Windows' own PDF engine draws through Direct2D on the graphics card,
+        // which crashed inside the AMD driver (atidxx64.dll) on the owner's PC.
+        public const int BitmapBgra = 4, RenderAnnotations = 0x01;
+        [DllImport(Dll)] public static extern IntPtr FPDFBitmap_CreateEx(int width, int height, int format, IntPtr firstScan, int stride);
+        [DllImport(Dll)] public static extern int FPDFBitmap_FillRect(IntPtr bitmap, int left, int top, int width, int height, uint color);
+        [DllImport(Dll)] public static extern void FPDF_RenderPageBitmap(IntPtr bitmap, IntPtr page, int startX, int startY, int sizeX, int sizeY, int rotate, int flags);
+        [DllImport(Dll)] public static extern void FPDFBitmap_Destroy(IntPtr bitmap);
 
         // Links: annotations with an address or a page to go to, plus web addresses written in the text.
         public const int ActionGoTo = 1, ActionUri = 3;
@@ -362,6 +371,43 @@ namespace PdfReaderApp
                 }
             }
             finally { Pdfium.FPDFLink_CloseWebLinks(web); }
+        }
+
+        // Draws a page at the given pixel size (the page's own rotation included). Returns a frozen image,
+        // or null if the page can't be drawn.
+        public BitmapSource Render(int index, int width, int height)
+        {
+            if (index < 0 || index >= pages.Length || width < 1 || height < 1) return null;
+            int stride = width * 4;
+            byte[] pixels;
+            try { pixels = new byte[(long)stride * height]; }
+            catch (OutOfMemoryException) { return null; }
+            var pin = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+            try
+            {
+                lock (Gate)
+                {
+                    if (document == IntPtr.Zero) return null;
+                    IntPtr page = Pdfium.FPDF_LoadPage(document, index);
+                    if (page == IntPtr.Zero) return null;
+                    IntPtr bitmap = Pdfium.FPDFBitmap_CreateEx(width, height, Pdfium.BitmapBgra, pin.AddrOfPinnedObject(), stride);
+                    try
+                    {
+                        if (bitmap == IntPtr.Zero) return null;
+                        Pdfium.FPDFBitmap_FillRect(bitmap, 0, 0, width, height, 0xFFFFFFFF);
+                        Pdfium.FPDF_RenderPageBitmap(bitmap, page, 0, 0, width, height, 0, Pdfium.RenderAnnotations);
+                    }
+                    finally
+                    {
+                        if (bitmap != IntPtr.Zero) Pdfium.FPDFBitmap_Destroy(bitmap);
+                        Pdfium.FPDF_ClosePage(page);
+                    }
+                }
+            }
+            finally { pin.Free(); }
+            BitmapSource image = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, pixels, stride);
+            image.Freeze();
+            return image;
         }
 
         // PDFium's own page-to-screen mapping, measured at three points on a large virtual screen and

@@ -129,7 +129,37 @@ namespace PdfReaderApp
             return await Wait(PdfDocument.LoadFromStreamAsync(mem));
         }
 
-        public static async Task<byte[]> RenderPngAsync(PdfPage page, int width, int height)
+        // Pages are drawn with PDFium (CPU) when it's available; Windows' engine (GPU) is only the fallback.
+        public static async Task<BitmapSource> RenderAsync(TextDocument pdfium, PdfPage page, int width, int height)
+        {
+            if (pdfium != null)
+            {
+                int index = (int)page.Index;
+                BitmapSource image = await Task.Run(() => pdfium.Render(index, width, height));
+                if (image != null) return image;
+            }
+            return ToImage(await RenderPngAsync(page, width, height));
+        }
+
+        public static async Task<byte[]> RenderPngAsync(TextDocument pdfium, PdfPage page, int width, int height)
+        {
+            if (pdfium != null)
+            {
+                int index = (int)page.Index;
+                BitmapSource image = await Task.Run(() => pdfium.Render(index, width, height));
+                if (image != null) return ToPng(image);
+            }
+            return await RenderPngAsync(page, width, height);
+        }
+
+        public static byte[] ToPng(BitmapSource image)
+        {
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(image));
+            using (var s = new MemoryStream()) { encoder.Save(s); return s.ToArray(); }
+        }
+
+        static async Task<byte[]> RenderPngAsync(PdfPage page, int width, int height)
         {
             var options = new PdfPageRenderOptions();
             options.DestinationWidth = (uint)width;
@@ -712,6 +742,7 @@ namespace PdfReaderApp
 
         async Task RememberRecent(string path, long size, PdfDocument loaded)
         {
+            TextDocument thumbSource = textDoc;
             var list = store.Recent().Where(r => !string.Equals(r["path"] as string, path, StringComparison.OrdinalIgnoreCase)).ToList();
             var entry = new Dictionary<string, object>();
             entry["path"] = path;
@@ -726,7 +757,7 @@ namespace PdfReaderApp
                 using (PdfPage page = loaded.GetPage(0))
                 {
                     double ratio = page.Size.Height / Math.Max(1, page.Size.Width);
-                    byte[] png = await Pdf.RenderPngAsync(page, 320, Math.Max(1, (int)(320 * ratio)));
+                    byte[] png = await Pdf.RenderPngAsync(thumbSource, page, 320, Math.Max(1, (int)(320 * ratio)));
                     Directory.CreateDirectory(Store.ThumbDir);
                     File.WriteAllBytes(Store.ThumbPath(path), png);
                 }
@@ -859,8 +890,9 @@ namespace PdfReaderApp
                 {
                     renderAgain = false;
                     PdfDocument current = doc;
+                    TextDocument pdfium = textDoc;
                     if (current == null) return;
-                    byte[] png;
+                    BitmapSource image;
                     double w, h;
                     using (PdfPage page = current.GetPage((uint)pageIndex))
                     {
@@ -872,12 +904,12 @@ namespace PdfReaderApp
                             scale = Math.Max(MinScale, scale);
                         }
                         scale = Math.Min(scale, MaxPixels / (Math.Max(w, h) * dpiScale));
-                        png = await Pdf.RenderPngAsync(page,
+                        image = await Pdf.RenderAsync(pdfium, page,
                             Math.Max(1, (int)Math.Round(w * scale * dpiScale)),
                             Math.Max(1, (int)Math.Round(h * scale * dpiScale)));
                     }
                     if (renderAgain || doc != current) continue;
-                    ShowPage(Pdf.ToImage(png));
+                    ShowPage(image);
                 } while (renderAgain);
             }
             catch (Exception ex)
@@ -1361,6 +1393,7 @@ namespace PdfReaderApp
         {
             PdfDocument doc = Pdf.LoadAsync(data).GetAwaiter().GetResult();
             int current = first;
+            using (TextDocument pdfium = TextDocument.Open(data))
             using (var job = new PrintDocument())
             {
                 job.DocumentName = name;
@@ -1380,7 +1413,7 @@ namespace PdfReaderApp
                         float w = (float)(page.Size.Width * fit), h = (float)(page.Size.Height * fit);
                         int pxW = Math.Max(1, (int)(w / 100f * PrintDpi));
                         int pxH = Math.Max(1, (int)(h / 100f * PrintDpi));
-                        byte[] png = Pdf.RenderPngAsync(page, pxW, pxH).GetAwaiter().GetResult();
+                        byte[] png = Pdf.RenderPngAsync(pdfium, page, pxW, pxH).GetAwaiter().GetResult();
                         using (var stream = new MemoryStream(png))
                         using (var bitmap = new Gdi.Bitmap(stream))
                         {

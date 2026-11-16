@@ -66,7 +66,7 @@ To update, run a newer installer over the top. Your settings and sign-ins stay. 
 
 ## Privacy
 
-- PDFs are read on your PC: pages are drawn by the PDF engine built into Windows, and text is read by PDFium. Nothing is uploaded unless you use Ask AI.
+- PDFs are read on your PC with PDFium. Nothing is uploaded unless you use Ask AI.
 - Settings, recent files and thumbnails are kept in `%LOCALAPPDATA%\PdfReader`. Sign-in tokens are encrypted to your Windows account.
 - Ask AI is stateless: each question sends the PDF and the conversation so far to the service you chose. PDF Reader doesn't keep a copy anywhere else, and ChatGPT requests are sent with storage turned off.
 
@@ -84,14 +84,14 @@ This produces `PdfReader.exe` and the installer at `dist\PDFReaderSetup-<version
 | --- | --- |
 | `PdfReader.cs` | The app: window, rendering, zoom, printing, settings and the Ask AI panel |
 | `Main.xaml`, `Theme.xaml` | Layout and dark theme |
-| `PdfText.cs`, `TextTools.cs` | Text layer from PDFium, and selecting, copying and Find |
+| `PdfText.cs`, `TextTools.cs` | PDFium: drawing pages, the text layer and links; selecting, copying, Find and clicking links |
 | `ChatGptAuth.cs` | Sign in with ChatGPT (browser sign-in with PKCE) |
 | `ClaudeCode.cs` | Runs the local Claude Code app for Claude answers |
 | `Setup.cs` | Per-user installer and uninstaller |
 
 ## Built with
 
-C# and WPF on .NET Framework 4.8, with the Windows.Data.Pdf engine built into Windows for drawing pages. Text selection and Find use [PDFium](https://pdfium.googlesource.com/pdfium/), Chrome's open-source PDF engine, from [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries). It's the only third-party library, and its licenses are in `third_party/pdfium` and installed as `THIRD-PARTY-NOTICES.txt`.
+C# and WPF on .NET Framework 4.8. Pages, text, links and printing use [PDFium](https://pdfium.googlesource.com/pdfium/), Chrome's open-source PDF engine, from [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries). It's the only third-party library, and its licenses are in `third_party/pdfium` and installed as `THIRD-PARTY-NOTICES.txt`.
 
 ## License
 
