@@ -80,6 +80,9 @@
         </StackPanel>
 
         <StackPanel Grid.Column='2' Orientation='Horizontal' HorizontalAlignment='Right' VerticalAlignment='Center'>
+          <Button x:Name='FindButton' Style='{StaticResource Flat}' ToolTip='Find in PDF (Ctrl+F)' Padding='9,8' Margin='0,0,4,0'>
+            <TextBlock Text='&#xE721;' FontFamily='{StaticResource Icons}' FontSize='14'/>
+          </Button>
           <Button x:Name='PrintButton' Style='{StaticResource Flat}' ToolTip='Print (Ctrl+P)'>
             <StackPanel Orientation='Horizontal'>
               <TextBlock Text='&#xE749;' FontFamily='{StaticResource Icons}' FontSize='14' VerticalAlignment='Center' Margin='0,0,7,0'/>
@@ -107,12 +110,39 @@
           <Border.Effect>
             <DropShadowEffect BlurRadius='24' ShadowDepth='3' Opacity='0.55' Color='Black'/>
           </Border.Effect>
-          <Image x:Name='PageImage' RenderOptions.BitmapScalingMode='NearestNeighbor' SnapsToDevicePixels='True'/>
+          <Grid>
+            <Image x:Name='PageImage' RenderOptions.BitmapScalingMode='NearestNeighbor' SnapsToDevicePixels='True'/>
+            <!-- Selection and Find highlights, drawn over the page. Transparent so it receives the mouse. -->
+            <Canvas x:Name='TextLayer' Background='Transparent' ClipToBounds='True'/>
+          </Grid>
         </Border>
       </ScrollViewer>
       <!-- Page bar: one step per page; the thumb's size shows how much of the document this page is. -->
       <ScrollBar x:Name='PageBar' Grid.Column='1' Width='14' MinWidth='14' Background='#1C1C1C' SmallChange='1' LargeChange='1'
                  Visibility='Collapsed' ToolTip='Drag to move between pages' Focusable='False'/>
+      <Border x:Name='FindBar' VerticalAlignment='Top' HorizontalAlignment='Right' Margin='0,12,22,0' Padding='6'
+              CornerRadius='10' Background='{StaticResource PanelBg}' BorderBrush='{StaticResource Line}' BorderThickness='1'
+              Visibility='Collapsed'>
+        <Border.Effect><DropShadowEffect BlurRadius='16' ShadowDepth='2' Opacity='0.5' Color='Black'/></Border.Effect>
+        <StackPanel Orientation='Horizontal'>
+          <Grid Width='220' VerticalAlignment='Center'>
+            <TextBox x:Name='FindBox' FontSize='13' Padding='10,7' ToolTip='Enter: next match. Shift+Enter: previous. Esc: close.'/>
+            <TextBlock x:Name='FindHint' Text='Find in PDF' FontSize='13' Foreground='{StaticResource Muted}'
+                       Margin='12,0,0,0' VerticalAlignment='Center' IsHitTestVisible='False'/>
+          </Grid>
+          <TextBlock x:Name='FindCount' FontSize='12.5' Foreground='{StaticResource Muted}' VerticalAlignment='Center'
+                     MinWidth='78' TextAlignment='Center' Margin='4,0'/>
+          <Button x:Name='FindPrevButton' Style='{StaticResource Flat}' ToolTip='Previous match (Shift+Enter)' Padding='8,7'>
+            <TextBlock Text='&#xE70E;' FontFamily='{StaticResource Icons}' FontSize='12'/>
+          </Button>
+          <Button x:Name='FindNextButton' Style='{StaticResource Flat}' ToolTip='Next match (Enter)' Padding='8,7'>
+            <TextBlock Text='&#xE70D;' FontFamily='{StaticResource Icons}' FontSize='12'/>
+          </Button>
+          <Button x:Name='FindCloseButton' Style='{StaticResource Flat}' ToolTip='Close (Esc)' Padding='8,7'>
+            <TextBlock Text='&#xE711;' FontFamily='{StaticResource Icons}' FontSize='12'/>
+          </Button>
+        </StackPanel>
+      </Border>
       <Border x:Name='PageBadge' HorizontalAlignment='Center' VerticalAlignment='Bottom' Margin='0,0,0,18' Padding='12,5'
               CornerRadius='12' Background='#D9202020' BorderBrush='{StaticResource Line}' BorderThickness='1'
               IsHitTestVisible='False' Visibility='Collapsed'>

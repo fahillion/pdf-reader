@@ -17,6 +17,13 @@ PDF Reader does a few things well. It opens PDFs, shows them clearly, zooms, pri
 - **Recent files** on the home screen, with page thumbnails.
 - **Printing** through the standard Windows print dialog, with page ranges.
 
+### Select, copy and find
+- **Select text** by dragging across it, as in a web page. Double-click selects a word, and triple-click selects a line. Press **Ctrl+C** or right-click to copy, or **Ctrl+A** to select the whole page.
+- **Find** with **Ctrl+F** or the search button. It highlights every match, shows "3 of 12", and jumps between matches and pages with **Enter** and **Shift+Enter**. Searches ignore case and work across line breaks.
+- Works with PDFs that contain real text. Scanned pages without a text layer can't be selected.
+
+![Find highlighting a match, with the match count](docs/screenshots/find.png)
+
 ![The reader on page 2 of 4, with the page bar and page count](docs/screenshots/reader.png)
 
 ### Ask AI (optional)
@@ -50,12 +57,15 @@ To update, run a newer installer over the top. Your settings and sign-ins stay. 
 | Home / End | First / last page |
 | Up / Down | Scroll the page |
 | Ctrl+Plus / Ctrl+Minus, Ctrl+wheel | Zoom in / out |
+| Ctrl+F, F3 / Shift+F3 | Find, next / previous match |
+| Ctrl+C, Ctrl+A | Copy the selection, select the whole page |
+| Esc | Close Find or clear the selection |
 | Ctrl+O | Open a PDF |
 | Ctrl+P | Print |
 
 ## Privacy
 
-- PDFs are read on your PC with the PDF engine built into Windows. Nothing is uploaded unless you use Ask AI.
+- PDFs are read on your PC: pages are drawn by the PDF engine built into Windows, and text is read by PDFium. Nothing is uploaded unless you use Ask AI.
 - Settings, recent files and thumbnails are kept in `%LOCALAPPDATA%\PdfReader`. Sign-in tokens are encrypted to your Windows account.
 - Ask AI is stateless: each question sends the PDF and the conversation so far to the service you chose. PDF Reader doesn't keep a copy anywhere else, and ChatGPT requests are sent with storage turned off.
 
@@ -67,19 +77,20 @@ You don't need Visual Studio or an SDK. The build uses the C# compiler that ship
 powershell -ExecutionPolicy Bypass -File build.ps1
 ```
 
-This produces `PdfReader.exe` and the installer at `dist\PDFReaderSetup-<version>.exe`. The version is set in `Setup.cs`.
+This produces `PdfReader.exe` and the installer at `dist\PDFReaderSetup-<version>.exe`. The version is set in `Setup.cs`. On the first build it downloads a pinned PDFium build and checks its hash.
 
 | File | What it does |
 | --- | --- |
 | `PdfReader.cs` | The app: window, rendering, zoom, printing, settings and the Ask AI panel |
 | `Main.xaml`, `Theme.xaml` | Layout and dark theme |
+| `PdfText.cs`, `TextTools.cs` | Text layer from PDFium, and selecting, copying and Find |
 | `ChatGptAuth.cs` | Sign in with ChatGPT (browser sign-in with PKCE) |
 | `ClaudeCode.cs` | Runs the local Claude Code app for Claude answers |
 | `Setup.cs` | Per-user installer and uninstaller |
 
 ## Built with
 
-C# and WPF on .NET Framework 4.8, plus the Windows.Data.Pdf rendering engine built into Windows. There are no third-party libraries.
+C# and WPF on .NET Framework 4.8, with the Windows.Data.Pdf engine built into Windows for drawing pages. Text selection and Find use [PDFium](https://pdfium.googlesource.com/pdfium/), Chrome's open-source PDF engine, from [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries). It's the only third-party library, and its licenses are in `third_party/pdfium` and installed as `THIRD-PARTY-NOTICES.txt`.
 
 ## License
 

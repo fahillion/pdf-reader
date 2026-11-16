@@ -432,7 +432,7 @@ namespace PdfReaderApp
         public IntPtr Handle { get { return handle; } }
     }
 
-    class MainWindow : Window
+    partial class MainWindow : Window
     {
         const double MinScale = 0.1, MaxScale = 8.0, ZoomStep = 1.25;
         const int MaxPixels = 12000, FitMargin = 40, MaxRecent = 8;
@@ -579,8 +579,9 @@ namespace PdfReaderApp
             {
                 if (!updatingPageBar) GoTo((int)Math.Round(e.NewValue));
             };
-            // Clicking the page takes focus back from the question box, so the arrows turn pages again.
-            pageScroller.PreviewMouseDown += delegate { if (askBox.IsKeyboardFocused) Focus(); };
+            InitTextTools();
+            // Clicking the page takes focus back from the question or Find box, so the arrows turn pages again.
+            pageScroller.PreviewMouseDown += delegate { if (askBox.IsKeyboardFocused || findBox.IsKeyboardFocused) Focus(); };
 
             resizeTimer.Interval = TimeSpan.FromMilliseconds(120);
             resizeTimer.Tick += delegate
@@ -619,16 +620,21 @@ namespace PdfReaderApp
         {
             bool ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
             bool typing = Keyboard.FocusedElement is TextBox || Keyboard.FocusedElement is PasswordBox;
+            if (doc != null && e.Key == Key.F3) { StepMatch((Keyboard.Modifiers & ModifierKeys.Shift) != 0 ? -1 : 1); e.Handled = true; return; }
             if (ctrl)
             {
-                if (e.Key == Key.O) { ChooseFile(); e.Handled = true; }
+                if (e.Key == Key.F && doc != null) { OpenFind(); e.Handled = true; }
+                else if (e.Key == Key.C && !typing && doc != null) { e.Handled = CopySelection(); }
+                else if (e.Key == Key.A && !typing && doc != null) { SelectAllOnPage(); e.Handled = true; }
+                else if (e.Key == Key.O) { ChooseFile(); e.Handled = true; }
                 else if (e.Key == Key.P) { Print(); e.Handled = true; }
                 else if (e.Key == Key.OemPlus || e.Key == Key.Add) { ZoomBy(ZoomStep); e.Handled = true; }
                 else if (e.Key == Key.OemMinus || e.Key == Key.Subtract) { ZoomBy(1 / ZoomStep); e.Handled = true; }
                 return;
             }
             if (typing || doc == null) return;
-            if (e.Key == Key.Left) { GoTo(pageIndex - 1); e.Handled = true; }
+            if (e.Key == Key.Escape) { if (findBar.Visibility == Visibility.Visible) CloseFind(); else ClearSelection(); e.Handled = true; }
+            else if (e.Key == Key.Left) { GoTo(pageIndex - 1); e.Handled = true; }
             else if (e.Key == Key.Right) { GoTo(pageIndex + 1); e.Handled = true; }
             else if (e.Key == Key.Up) { pageScroller.ScrollToVerticalOffset(pageScroller.VerticalOffset - 60); e.Handled = true; }
             else if (e.Key == Key.Down) { pageScroller.ScrollToVerticalOffset(pageScroller.VerticalOffset + 60); e.Handled = true; }
@@ -655,6 +661,7 @@ namespace PdfReaderApp
                 CancelAsk();
                 data = bytes;
                 doc = loaded;
+                OpenText(bytes);
                 filePath = Path.GetFullPath(path);
                 fileName = Path.GetFileName(path);
                 pdfBase64 = null;
@@ -693,6 +700,7 @@ namespace PdfReaderApp
             data = null;
             pdfBase64 = null;
             pageImage.Source = null;
+            CloseText();
             Title = "PDF Reader";
             readerView.Visibility = Visibility.Collapsed;
             homeView.Visibility = Visibility.Visible;
@@ -808,6 +816,7 @@ namespace PdfReaderApp
         {
             if (doc == null || index < 0 || index >= doc.PageCount || index == pageIndex) return;
             pageIndex = index;
+            selAnchor = -1; selStart = selEnd = 0;   // A selection belongs to the page it was made on.
             scrollToTop = !atBottom;
             scrollToBottom = atBottom;
             UpdateReaderUi();   // The count and bar move at once; the page image follows when rendered.
@@ -908,6 +917,8 @@ namespace PdfReaderApp
                 pageScroller.ScrollToHorizontalOffset(cx * pageImage.Width / oldW - pageScroller.ViewportWidth / 2);
                 pageScroller.ScrollToVerticalOffset(cy * pageImage.Height / oldH - pageScroller.ViewportHeight / 2);
             }
+            DrawTextLayer();
+            RevealMatch();
             UpdateReaderUi();
         }
 

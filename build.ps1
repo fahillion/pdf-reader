@@ -35,6 +35,33 @@ if (-not (Test-Path $ico)) {
     $g.Dispose(); $bmp.Dispose()
 }
 
+# PDFium reads the text in PDFs (selecting, copying, Find). It's a pinned build from
+# github.com/bblanchon/pdfium-binaries, checked by hash; only its license files are kept in git.
+$pdfiumTag = 'chromium/8125'
+$pdfiumHash = '9a964261760cff52570aabf038ab346d3a5034dd8b30d0d5fe8861235d356b8b'
+$pdfiumDir = "$here\third_party\pdfium"
+$pdfiumDll = "$pdfiumDir\pdfium.dll"
+if (-not (Test-Path $pdfiumDll)) {
+    $tgz = Join-Path $env:TEMP 'pdfium-win-x64.tgz'
+    Invoke-WebRequest "https://github.com/bblanchon/pdfium-binaries/releases/download/$pdfiumTag/pdfium-win-x64.tgz" -OutFile $tgz -UseBasicParsing
+    if ((Get-FileHash $tgz -Algorithm SHA256).Hash -ne $pdfiumHash) { Remove-Item $tgz; throw "PDFium download doesn't match the expected hash" }
+    $unpack = Join-Path $env:TEMP 'pdfium-unpack'
+    if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
+    New-Item -ItemType Directory $unpack | Out-Null
+    & "$env:WINDIR\System32\tar.exe" -xzf $tgz -C $unpack bin/pdfium.dll
+    if ($LASTEXITCODE -ne 0) { throw "Couldn't unpack PDFium" }
+    Copy-Item "$unpack\bin\pdfium.dll" $pdfiumDll
+    Remove-Item $unpack -Recurse -Force; Remove-Item $tgz
+}
+Copy-Item $pdfiumDll "$here\pdfium.dll" -Force   # Next to PdfReader.exe, for running the build in place.
+
+# One notices file for everything PDFium includes, shipped with the app.
+$notices = "$here\THIRD-PARTY-NOTICES.txt"
+$parts = @("PDF Reader includes PDFium ($pdfiumTag build from https://github.com/bblanchon/pdfium-binaries).", '')
+$parts += "==== pdfium-binaries ====", (Get-Content "$pdfiumDir\LICENSE" -Raw -Encoding UTF8), ''
+foreach ($f in Get-ChildItem "$pdfiumDir\licenses" | Sort-Object Name) { $parts += "==== $($f.Name) ====", (Get-Content $f.FullName -Raw -Encoding UTF8), '' }
+[IO.File]::WriteAllText($notices, ($parts -join "`r`n"), (New-Object Text.UTF8Encoding $false))
+
 $refs = @(
     "$fx\System.dll",
     "$fx\System.Core.dll",
@@ -62,7 +89,7 @@ $lines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimiz
     "/resource:`"$here\Theme.xaml`",Theme.xaml", "/resource:`"$here\Main.xaml`",Main.xaml",
     "/r:`"$fx\mscorlib.dll`"")
 $lines += $refs | ForEach-Object { "/r:`"$_`"" }
-$lines += "`"$here\PdfReader.cs`"", "`"$here\ChatGptAuth.cs`"", "`"$here\ClaudeCode.cs`""
+$lines += "`"$here\PdfReader.cs`"", "`"$here\PdfText.cs`"", "`"$here\TextTools.cs`"", "`"$here\ChatGptAuth.cs`"", "`"$here\ClaudeCode.cs`""
 Set-Content -Path $rsp -Value $lines -Encoding ASCII
 
 & "$fx\csc.exe" "@$rsp"
@@ -80,6 +107,7 @@ $setupRsp = Join-Path $env:TEMP 'pdfreader-setup.rsp'
 $setupLines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimize+',
     "/win32manifest:`"$here\setup.manifest`"", "/win32icon:`"$ico`"", "/out:`"$setupExe`"",
     "/resource:`"$here\PdfReader.exe`",PdfReader.exe", "/resource:`"$here\Theme.xaml`",Theme.xaml",
+    "/resource:`"$pdfiumDll`",pdfium.dll", "/resource:`"$notices`",THIRD-PARTY-NOTICES.txt",
     "/r:`"$fx\mscorlib.dll`"")
 $setupLines += $refs | ForEach-Object { "/r:`"$_`"" }
 $setupLines += "`"$here\Setup.cs`""

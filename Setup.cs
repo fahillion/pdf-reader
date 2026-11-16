@@ -56,9 +56,10 @@ namespace PdfReaderSetup
             Directory.CreateDirectory(AppDir);
             try
             {
-                using (Stream payload = Assembly.GetExecutingAssembly().GetManifestResourceStream("PdfReader.exe"))
-                using (var file = new FileStream(AppExe, FileMode.Create, FileAccess.Write))
-                    payload.CopyTo(file);
+                foreach (string name in new[] { "PdfReader.exe", "pdfium.dll", "THIRD-PARTY-NOTICES.txt" })
+                    using (Stream payload = Assembly.GetExecutingAssembly().GetManifestResourceStream(name))
+                    using (var file = new FileStream(Path.Combine(AppDir, name), FileMode.Create, FileAccess.Write))
+                        payload.CopyTo(file);
                 string self = Assembly.GetExecutingAssembly().Location;
                 string kept = Path.Combine(AppDir, SetupName);
                 if (!string.Equals(Path.GetFullPath(self), Path.GetFullPath(kept), StringComparison.OrdinalIgnoreCase))
