@@ -17,10 +17,11 @@ PDF Reader does a few things well. It opens PDFs, shows them clearly, zooms, pri
 - **Recent files** on the home screen, with page thumbnails.
 - **Printing** through the standard Windows print dialog, with page ranges.
 
-### Select, copy and find
+### Select, copy, find and follow links
 - **Select text** by dragging across it, as in a web page. Double-click selects a word, and triple-click selects a line. Press **Ctrl+C** or right-click to copy, or **Ctrl+A** to select the whole page.
 - **Find** with **Ctrl+F** or the search button. It highlights every match, shows "3 of 12", and jumps between matches and pages with **Enter** and **Shift+Enter**. Searches ignore case and work across line breaks.
 - Works with PDFs that contain real text. Scanned pages without a text layer can't be selected.
+- **Links work:** click a link to open it in your browser or email app, or to jump to another page of the PDF. Web and email addresses written as plain text are clickable too, and hovering shows where a link goes. For safety, only web and email links open; links that try to run programs or open files are ignored.
 
 ![Find highlighting a match, with the match count](docs/screenshots/find.png)
 

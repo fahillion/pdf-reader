@@ -970,6 +970,8 @@ namespace PdfReaderApp
 
         static void OpenLink(string url)
         {
+            string log = Environment.GetEnvironmentVariable("PDFREADER_TEST_OPENLOG");
+            if (log != null) { File.AppendAllText(log, url + Environment.NewLine); return; }
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
 

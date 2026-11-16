@@ -31,6 +31,47 @@ namespace PdfReaderApp
         [DllImport(Dll)] public static extern int FPDFText_CountChars(IntPtr textPage);
         [DllImport(Dll)] public static extern uint FPDFText_GetUnicode(IntPtr textPage, int index);
         [DllImport(Dll)] public static extern int FPDFText_GetLooseCharBox(IntPtr textPage, int index, out RectF rect);
+
+        // Links: annotations with an address or a page to go to, plus web addresses written in the text.
+        public const int ActionGoTo = 1, ActionUri = 3;
+        [DllImport(Dll)] public static extern int FPDFLink_Enumerate(IntPtr page, ref int startPos, out IntPtr link);
+        [DllImport(Dll)] public static extern int FPDFLink_GetAnnotRect(IntPtr link, out RectF rect);
+        [DllImport(Dll)] public static extern IntPtr FPDFLink_GetDest(IntPtr doc, IntPtr link);
+        [DllImport(Dll)] public static extern IntPtr FPDFLink_GetAction(IntPtr link);
+        [DllImport(Dll)] public static extern uint FPDFAction_GetType(IntPtr action);
+        [DllImport(Dll)] public static extern IntPtr FPDFAction_GetDest(IntPtr doc, IntPtr action);
+        [DllImport(Dll)] public static extern uint FPDFAction_GetURIPath(IntPtr doc, IntPtr action, byte[] buffer, uint length);
+        [DllImport(Dll)] public static extern int FPDFDest_GetDestPageIndex(IntPtr doc, IntPtr dest);
+        [DllImport(Dll)] public static extern IntPtr FPDFLink_LoadWebLinks(IntPtr textPage);
+        [DllImport(Dll)] public static extern int FPDFLink_CountWebLinks(IntPtr linkPage);
+        [DllImport(Dll)] public static extern int FPDFLink_GetURL(IntPtr linkPage, int index, ushort[] buffer, int length);   // UTF-16 units; char[] would be marshaled as 1-byte ANSI.
+        [DllImport(Dll)] public static extern int FPDFLink_CountRects(IntPtr linkPage, int index);
+        [DllImport(Dll)] public static extern int FPDFLink_GetRect(IntPtr linkPage, int index, int rectIndex, out double left, out double top, out double right, out double bottom);
+        [DllImport(Dll)] public static extern void FPDFLink_CloseWebLinks(IntPtr linkPage);
+    }
+
+    // A clickable area: a web or email address, or another page of this PDF.
+    class PdfLink
+    {
+        public List<Rect> Boxes = new List<Rect>();   // PDF page space.
+        public string Url;                            // http, https or mailto only.
+        public int Page = -1;                         // For links within the PDF.
+
+        public string Describe() { return Url ?? "Go to page " + (Page + 1); }
+
+        // Only web and email addresses open. Anything else a PDF could ask for (programs, files,
+        // other documents) is ignored, so a link can never run something on this PC.
+        public static string SafeUrl(string raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return null;
+            string s = raw.Trim().TrimEnd('\0');
+            if (s.StartsWith("www.", StringComparison.OrdinalIgnoreCase)) s = "http://" + s;
+            Uri u;
+            if (!Uri.TryCreate(s, UriKind.Absolute, out u)) return null;
+            if (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps) return u.AbsoluteUri;
+            if (u.Scheme == Uri.UriSchemeMailto && s.Length > 7) return s;
+            return null;
+        }
     }
 
     // One page's text. Boxes are in PDF page space (points, y up); ToView maps page space to 0..1 of the
@@ -41,6 +82,7 @@ namespace PdfReaderApp
         public Rect[] Boxes = new Rect[0];
         public Matrix ToView = Matrix.Identity;
         public Matrix FromView = Matrix.Identity;
+        public List<PdfLink> Links = new List<PdfLink>();
         string searchable;
         int[] searchMap;
 
@@ -71,6 +113,15 @@ namespace PdfReaderApp
                 if (score < bestScore) { bestScore = score; best = p.X < b.Left + b.Width / 2 ? i : i + 1; }
             }
             return best;
+        }
+
+        public PdfLink LinkAt(Point view)
+        {
+            Point p = FromView.Transform(view);
+            foreach (PdfLink link in Links)
+                foreach (Rect b in link.Boxes)
+                    if (b.Contains(p)) return link;
+            return null;
         }
 
         public bool IsOverText(Point view)
@@ -209,6 +260,7 @@ namespace PdfReaderApp
                         result.ToView = ViewMatrix(page);
                         result.FromView = result.ToView;
                         if (result.FromView.HasInverse) result.FromView.Invert();
+                        result.Links = AnnotationLinks(page);
                         IntPtr textPage = Pdfium.FPDFText_LoadPage(page);
                         if (textPage != IntPtr.Zero)
                         {
@@ -228,6 +280,7 @@ namespace PdfReaderApp
                                 }
                                 result.Text = new string(text);
                                 result.Boxes = boxes;
+                                AddWebLinks(textPage, result.Links);
                             }
                             finally { Pdfium.FPDFText_ClosePage(textPage); }
                         }
@@ -237,6 +290,78 @@ namespace PdfReaderApp
                 pages[index] = result;
                 return result;
             }
+        }
+
+        List<PdfLink> AnnotationLinks(IntPtr page)
+        {
+            var links = new List<PdfLink>();
+            int pos = 0;
+            IntPtr annot;
+            while (Pdfium.FPDFLink_Enumerate(page, ref pos, out annot) != 0)
+            {
+                Pdfium.RectF r;
+                if (annot == IntPtr.Zero || Pdfium.FPDFLink_GetAnnotRect(annot, out r) == 0) continue;
+                var link = new PdfLink();
+                IntPtr dest = Pdfium.FPDFLink_GetDest(document, annot);
+                IntPtr action = Pdfium.FPDFLink_GetAction(annot);
+                if (dest == IntPtr.Zero && action != IntPtr.Zero)
+                {
+                    uint type = Pdfium.FPDFAction_GetType(action);
+                    if (type == Pdfium.ActionGoTo) dest = Pdfium.FPDFAction_GetDest(document, action);
+                    else if (type == Pdfium.ActionUri)
+                    {
+                        uint n = Pdfium.FPDFAction_GetURIPath(document, action, null, 0);
+                        if (n > 1 && n < 65536)
+                        {
+                            var buf = new byte[n];
+                            Pdfium.FPDFAction_GetURIPath(document, action, buf, n);
+                            link.Url = PdfLink.SafeUrl(Encoding.UTF8.GetString(buf, 0, (int)n - 1));
+                        }
+                    }
+                }
+                if (dest != IntPtr.Zero) link.Page = Pdfium.FPDFDest_GetDestPageIndex(document, dest);
+                if (link.Url == null && (link.Page < 0 || link.Page >= pages.Length)) continue;
+                link.Boxes.Add(new Rect(new Point(Math.Min(r.Left, r.Right), Math.Min(r.Top, r.Bottom)), new Point(Math.Max(r.Left, r.Right), Math.Max(r.Top, r.Bottom))));
+                links.Add(link);
+            }
+            return links;
+        }
+
+        // Addresses typed as plain text ("www.example.com", "name@example.com") are clickable too,
+        // unless a real link already covers them.
+        static void AddWebLinks(IntPtr textPage, List<PdfLink> links)
+        {
+            IntPtr web = Pdfium.FPDFLink_LoadWebLinks(textPage);
+            if (web == IntPtr.Zero) return;
+            try
+            {
+                int count = Pdfium.FPDFLink_CountWebLinks(web);
+                for (int i = 0; i < count; i++)
+                {
+                    int n = Pdfium.FPDFLink_GetURL(web, i, null, 0);
+                    if (n <= 1 || n > 65536) continue;
+                    var buf = new ushort[n];
+                    Pdfium.FPDFLink_GetURL(web, i, buf, n);
+                    var chars = new char[n - 1];
+                    for (int c = 0; c < n - 1; c++) chars[c] = (char)buf[c];
+                    var link = new PdfLink { Url = PdfLink.SafeUrl(new string(chars)) };
+                    if (link.Url == null) continue;
+                    int rects = Pdfium.FPDFLink_CountRects(web, i);
+                    for (int k = 0; k < rects; k++)
+                    {
+                        double l, t, rr, b;
+                        if (Pdfium.FPDFLink_GetRect(web, i, k, out l, out t, out rr, out b) != 0)
+                            link.Boxes.Add(new Rect(new Point(Math.Min(l, rr), Math.Min(t, b)), new Point(Math.Max(l, rr), Math.Max(t, b))));
+                    }
+                    bool covered = false;
+                    foreach (PdfLink other in links)
+                        foreach (Rect o in other.Boxes)
+                            foreach (Rect mine in link.Boxes)
+                                if (o.IntersectsWith(mine)) covered = true;
+                    if (link.Boxes.Count > 0 && !covered) links.Add(link);
+                }
+            }
+            finally { Pdfium.FPDFLink_CloseWebLinks(web); }
         }
 
         // PDFium's own page-to-screen mapping, measured at three points on a large virtual screen and

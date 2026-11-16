@@ -30,6 +30,9 @@ namespace PdfReaderApp
         TextDocument textDoc;
         int selAnchor = -1, selStart, selEnd;   // Character boundaries on the current page.
         bool selecting;
+        PdfLink pressedLink;     // A link under the mouse when the button went down; followed if it isn't a drag.
+        Point pressedAt;
+        PdfLink hoverLink;
         List<Match> matches = new List<Match>();
         int matchIndex = -1, findVersion;
         Match revealMatch;
@@ -67,7 +70,9 @@ namespace PdfReaderApp
 
             textLayer.MouseLeftButtonDown += TextMouseDown;
             textLayer.MouseMove += TextMouseMove;
-            textLayer.MouseLeftButtonUp += delegate { if (selecting) { selecting = false; textLayer.ReleaseMouseCapture(); } };
+            textLayer.MouseLeftButtonUp += TextMouseUp;
+            textLayer.MouseLeave += delegate { SetHoverLink(null); };
+            ToolTipService.SetInitialShowDelay(textLayer, 350);
 
             var menu = new ContextMenu();
             var copy = new MenuItem { Header = "Copy", InputGestureText = "Ctrl+C" };
@@ -114,11 +119,14 @@ namespace PdfReaderApp
         void TextMouseDown(object sender, MouseButtonEventArgs e)
         {
             PageText text = CurrentText();
+            pressedLink = e.ClickCount == 1 ? text.LinkAt(ViewPoint(e)) : null;
+            pressedAt = e.GetPosition(textLayer);
             bool exact;
             int at = text.BoundaryAt(ViewPoint(e), out exact);
             if (at < 0 || !exact && !NearText(text, e))
             {
                 ClearSelection();
+                if (pressedLink != null) { textLayer.CaptureMouse(); e.Handled = true; }
                 return;
             }
             if (e.ClickCount == 2) { SelectAround(text, at, false); e.Handled = true; return; }
@@ -139,9 +147,37 @@ namespace PdfReaderApp
             return text.IsOverText(new Point(v.X - step, v.Y)) || text.IsOverText(new Point(v.X + step, v.Y));
         }
 
+        void TextMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            PdfLink link = pressedLink;
+            pressedLink = null;
+            selecting = false;
+            textLayer.ReleaseMouseCapture();
+            // A click (not a drag) on a link follows it.
+            if (link != null && (e.GetPosition(textLayer) - pressedAt).Length < 5)
+            {
+                ClearSelection();
+                FollowLink(link);
+            }
+        }
+
+        void FollowLink(PdfLink link)
+        {
+            if (link.Url != null) OpenLink(link.Url);
+            else if (link.Page >= 0) { GoTo(link.Page); Focus(); }
+        }
+
+        void SetHoverLink(PdfLink link)
+        {
+            if (link == hoverLink) return;
+            hoverLink = link;
+            textLayer.ToolTip = link == null ? null : link.Describe();
+        }
+
         void TextMouseMove(object sender, MouseEventArgs e)
         {
             PageText text = CurrentText();
+            if (pressedLink != null && (e.GetPosition(textLayer) - pressedAt).Length >= 5) pressedLink = null;   // It's a drag now.
             if (selecting && e.LeftButton == MouseButtonState.Pressed)
             {
                 bool exact;
@@ -155,7 +191,9 @@ namespace PdfReaderApp
                 AutoScroll(e);
                 return;
             }
-            textLayer.Cursor = text.IsOverText(ViewPoint(e)) ? Cursors.IBeam : null;
+            PdfLink link = text.LinkAt(ViewPoint(e));
+            SetHoverLink(link);
+            textLayer.Cursor = link != null ? Cursors.Hand : text.IsOverText(ViewPoint(e)) ? Cursors.IBeam : null;
         }
 
         // Dragging past the visible part of a zoomed page scrolls it.
