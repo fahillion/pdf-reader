@@ -44,7 +44,7 @@ PDF Reader does a few things well. It opens PDFs, shows them clearly, zooms, pri
 2. Run it and choose **Install**. It installs for your Windows account only, so it doesn't need admin rights.
 3. To make it your default PDF app, choose **Set as default** at the end of the install. You can also go to **Settings > Apps > Default apps**, search for `.pdf`, and pick **PDF Reader**.
 
-To update, run a newer installer over the top. Your settings and sign-ins stay. To uninstall, go to **Settings > Apps > Installed apps**.
+Updates: from version 1.4.0, PDF Reader checks GitHub for a newer release when it starts (at most once a day) and shows a bar with **Update** and **Later**. **Update** downloads the installer, checks it against the SHA-256 checksum GitHub publishes for it, installs it and reopens the app with your PDF. To turn the check off, click **Check for updates at start** at the bottom of the home screen. You can also run a newer installer over the top. Your settings and sign-ins stay either way. To uninstall, go to **Settings > Apps > Installed apps**.
 
 **Requirements:** Windows 11, 64-bit (Windows 10 should also work but hasn't been tested). The .NET Framework 4.8 runtime it uses is built into Windows.
 
@@ -67,6 +67,7 @@ To update, run a newer installer over the top. Your settings and sign-ins stay. 
 ## Privacy
 
 - PDFs are read on your PC with PDFium. Nothing is uploaded unless you use Ask AI.
+- The update check asks GitHub's API for the latest release. It sends nothing about you or your files beyond the request itself (your IP address, and the app name and version). You can turn it off on the home screen.
 - Settings, recent files and thumbnails are kept in `%LOCALAPPDATA%\PdfReader`. Sign-in tokens are encrypted to your Windows account.
 - Ask AI is stateless: each question sends the PDF and the conversation so far to the service you chose. PDF Reader doesn't keep a copy anywhere else, and ChatGPT requests are sent with storage turned off.
 

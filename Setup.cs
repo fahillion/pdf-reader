@@ -3,6 +3,8 @@
 //   PDFReaderSetup-<version>.exe       install, with a window
 //   PDFReaderSetup-<version>.exe /uninstall  uninstall, with a window
 //   add /silent to either for no window
+//   PDFReaderSetup-<version>.exe /update [/open "file.pdf"]  what the app runs to update itself: waits for
+//     the app to close, installs with no window, then opens the app again (with that PDF, if given)
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -21,13 +23,13 @@ using Microsoft.Win32;
 [assembly: TargetFramework(".NETFramework,Version=v4.8")]
 [assembly: AssemblyTitle("PDF Reader Setup")]
 [assembly: AssemblyProduct("PDF Reader")]
-[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyVersion("1.4.0.0")]
 
 namespace PdfReaderSetup
 {
     static class Installer
     {
-        public const string Version = "1.3.0";
+        public const string Version = "1.4.0";
         const string AppName = "PDF Reader";
         const string ProgId = "PdfReader.Document";
         const string SetupName = "Setup.exe";
@@ -298,12 +300,17 @@ namespace PdfReaderSetup
         [STAThread]
         static int Main(string[] args)
         {
-            bool uninstall = false, silent = false;
-            foreach (string a in args)
+            bool uninstall = false, silent = false, update = false;
+            string open = null;
+            for (int i = 0; i < args.Length; i++)
             {
+                string a = args[i];
                 if (string.Equals(a, "/uninstall", StringComparison.OrdinalIgnoreCase)) uninstall = true;
                 if (string.Equals(a, "/silent", StringComparison.OrdinalIgnoreCase)) silent = true;
+                if (string.Equals(a, "/update", StringComparison.OrdinalIgnoreCase)) update = true;
+                if (string.Equals(a, "/open", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) open = args[++i];
             }
+            if (update && !uninstall) return Update(open);
             if (silent)
             {
                 try
@@ -323,6 +330,25 @@ namespace PdfReaderSetup
                 app.Resources = (ResourceDictionary)XamlReader.Load(s);
             app.Run(new SetupWindow(uninstall));
             if (Installer.Removed) Installer.RemoveAppDir();
+            return 0;
+        }
+
+        // The app has just closed itself to be replaced; give it up to 30 seconds to let go of its files.
+        static int Update(string open)
+        {
+            for (int attempt = 0; ; attempt++)
+            {
+                try { Installer.Install(); break; }
+                catch (Exception ex)
+                {
+                    if (ex is InvalidOperationException && attempt < 60) { Thread.Sleep(500); continue; }
+                    MessageBox.Show("PDF Reader wasn't updated.\n\n" + ex.Message, "PDF Reader Setup", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return 1;
+                }
+            }
+            var start = new ProcessStartInfo(Installer.AppExe) { UseShellExecute = false, WorkingDirectory = Installer.AppDir };
+            if (open != null && File.Exists(open)) start.Arguments = "\"" + open + "\"";
+            try { Process.Start(start); } catch (Exception) { }
             return 0;
         }
     }

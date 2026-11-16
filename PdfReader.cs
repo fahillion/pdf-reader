@@ -610,6 +610,7 @@ namespace PdfReaderApp
                 if (!updatingPageBar) GoTo((int)Math.Round(e.NewValue));
             };
             InitTextTools();
+            InitUpdates();
             // Clicking the page takes focus back from the question or Find box, so the arrows turn pages again.
             pageScroller.PreviewMouseDown += delegate { if (askBox.IsKeyboardFocused || findBox.IsKeyboardFocused) Focus(); };
 

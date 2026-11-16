@@ -89,7 +89,7 @@ $lines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimiz
     "/resource:`"$here\Theme.xaml`",Theme.xaml", "/resource:`"$here\Main.xaml`",Main.xaml",
     "/r:`"$fx\mscorlib.dll`"")
 $lines += $refs | ForEach-Object { "/r:`"$_`"" }
-$lines += "`"$here\PdfReader.cs`"", "`"$here\PdfText.cs`"", "`"$here\TextTools.cs`"", "`"$here\ChatGptAuth.cs`"", "`"$here\ClaudeCode.cs`""
+$lines += "`"$here\PdfReader.cs`"", "`"$here\PdfText.cs`"", "`"$here\TextTools.cs`"", "`"$here\ChatGptAuth.cs`"", "`"$here\ClaudeCode.cs`"", "`"$here\Updates.cs`""
 Set-Content -Path $rsp -Value $lines -Encoding ASCII
 
 & "$fx\csc.exe" "@$rsp"
@@ -102,6 +102,8 @@ New-Item -ItemType Directory -Force $dist | Out-Null
 # The file name carries the version from Setup.cs, for example PDFReaderSetup-1.1.0.exe.
 $version = [regex]::Match((Get-Content "$here\Setup.cs" -Raw), 'public const string Version = "([0-9.]+)"').Groups[1].Value
 if (-not $version) { throw "Couldn't read the version from Setup.cs" }
+$appVersion = [regex]::Match((Get-Content "$here\Updates.cs" -Raw), 'public const string Version = "([0-9.]+)"').Groups[1].Value
+if ($appVersion -ne $version) { throw "Version in Updates.cs ($appVersion) doesn't match Setup.cs ($version)" }
 $setupExe = "$dist\PDFReaderSetup-$version.exe"
 $setupRsp = Join-Path $env:TEMP 'pdfreader-setup.rsp'
 $setupLines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimize+',
