@@ -24,7 +24,7 @@ namespace PdfReaderApp
     static class AppInfo
     {
         // Keep in step with Setup.cs; build.ps1 checks that they match.
-        public const string Version = "1.4.0";
+        public const string Version = "1.5.0";
     }
 
     class Release

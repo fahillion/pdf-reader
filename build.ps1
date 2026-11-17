@@ -89,7 +89,7 @@ $lines = @('/nologo', '/nostdlib+', '/target:winexe', '/platform:x64', '/optimiz
     "/resource:`"$here\Theme.xaml`",Theme.xaml", "/resource:`"$here\Main.xaml`",Main.xaml",
     "/r:`"$fx\mscorlib.dll`"")
 $lines += $refs | ForEach-Object { "/r:`"$_`"" }
-$lines += "`"$here\PdfReader.cs`"", "`"$here\PdfText.cs`"", "`"$here\TextTools.cs`"", "`"$here\ChatGptAuth.cs`"", "`"$here\ClaudeCode.cs`"", "`"$here\Updates.cs`""
+$lines += "`"$here\PdfReader.cs`"", "`"$here\PdfText.cs`"", "`"$here\TextTools.cs`"", "`"$here\ChatGptAuth.cs`"", "`"$here\ClaudeCode.cs`"", "`"$here\Updates.cs`"", "`"$here\Tracking.cs`""
 Set-Content -Path $rsp -Value $lines -Encoding ASCII
 
 & "$fx\csc.exe" "@$rsp"

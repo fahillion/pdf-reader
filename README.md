@@ -22,6 +22,7 @@ PDF Reader does a few things well. It opens PDFs, shows them clearly, zooms, pri
 - **Find** with **Ctrl+F** or the search button. It highlights every match, shows "3 of 12", and jumps between matches and pages with **Enter** and **Shift+Enter**. Searches ignore case and work across line breaks.
 - Works with PDFs that contain real text. Scanned pages without a text layer can't be selected.
 - **Links work:** click a link to open it in your browser or email app, or to jump to another page of the PDF. Web and email addresses written as plain text are clickable too, and hovering shows where a link goes. For safety, only web and email links open; links that try to run programs or open files are ignored.
+- **Tracking numbers are clickable:** UPS, USPS, FedEx and Amazon numbers in a PDF open the carrier's tracking page in your browser. When Ask AI mentions one, a **Track** button appears under the answer. Numbers are checked against each carrier's check digit, so order and phone numbers aren't mistaken for them. PDF Reader doesn't look anything up itself.
 
 ![Find highlighting a match, with the match count](docs/screenshots/find.png)
 
@@ -92,7 +93,7 @@ This produces `PdfReader.exe` and the installer at `dist\PDFReaderSetup-<version
 
 ## Built with
 
-C# and WPF on .NET Framework 4.8. Pages, text, links and printing use [PDFium](https://pdfium.googlesource.com/pdfium/), Chrome's open-source PDF engine, from [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries). It's the only third-party library, and its licenses are in `third_party/pdfium` and installed as `THIRD-PARTY-NOTICES.txt`.
+C# and WPF on .NET Framework 4.8. Pages, text, links and printing use [PDFium](https://pdfium.googlesource.com/pdfium/), Chrome's open-source PDF engine, from [pdfium-binaries](https://github.com/bblanchon/pdfium-binaries). It's the only third-party library, and its licenses are in `third_party/pdfium` and installed as `THIRD-PARTY-NOTICES.txt`. Tracking-number formats follow [tracking_number_data](https://github.com/jkeen/tracking_number_data) (MIT).
 
 ## License
 

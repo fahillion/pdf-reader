@@ -65,8 +65,9 @@ namespace PdfReaderApp
         public List<Rect> Boxes = new List<Rect>();   // PDF page space.
         public string Url;                            // http, https or mailto only.
         public int Page = -1;                         // For links within the PDF.
+        public string Label;                          // Shown instead of the address, for tracking numbers.
 
-        public string Describe() { return Url ?? "Go to page " + (Page + 1); }
+        public string Describe() { return Label ?? Url ?? "Go to page " + (Page + 1); }
 
         // Only web and email addresses open. Anything else a PDF could ask for (programs, files,
         // other documents) is ignored, so a link can never run something on this PC.
@@ -290,6 +291,7 @@ namespace PdfReaderApp
                                 result.Text = new string(text);
                                 result.Boxes = boxes;
                                 AddWebLinks(textPage, result.Links);
+                                AddTrackingLinks(result);
                             }
                             finally { Pdfium.FPDFText_ClosePage(textPage); }
                         }
@@ -334,6 +336,32 @@ namespace PdfReaderApp
                 links.Add(link);
             }
             return links;
+        }
+
+        // Shipping tracking numbers open the carrier's tracking page (Tracking.cs).
+        static void AddTrackingLinks(PageText page)
+        {
+            foreach (TrackingNumber t in Tracking.Find(page.Text))
+            {
+                var link = new PdfLink { Url = PdfLink.SafeUrl(t.Url), Label = "Track on " + t.Carrier + " (opens " + new Uri(t.Url).Host + ")" };
+                Rect line = Rect.Empty;
+                for (int i = t.Start; i < t.End && i < page.Boxes.Length; i++)
+                {
+                    Rect b = page.Boxes[i];
+                    if (b.IsEmpty || b.Width <= 0 || b.Height <= 0) continue;
+                    if (line.IsEmpty) { line = b; continue; }
+                    double overlap = Math.Min(line.Bottom, b.Bottom) - Math.Max(line.Top, b.Top);
+                    if (overlap >= 0.5 * Math.Min(line.Height, b.Height)) line.Union(b);
+                    else { link.Boxes.Add(line); line = b; }
+                }
+                if (!line.IsEmpty) link.Boxes.Add(line);
+                bool covered = false;
+                foreach (PdfLink other in page.Links)
+                    foreach (Rect o in other.Boxes)
+                        foreach (Rect mine in link.Boxes)
+                            if (o.IntersectsWith(mine)) covered = true;
+                if (link.Url != null && link.Boxes.Count > 0 && !covered) page.Links.Add(link);
+            }
         }
 
         // Addresses typed as plain text ("www.example.com", "name@example.com") are clickable too,

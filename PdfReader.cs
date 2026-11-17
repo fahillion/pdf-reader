@@ -1246,6 +1246,7 @@ namespace PdfReaderApp
                 else
                 {
                     turns.Add(new Turn { IsUser = false, Text = result.Text });
+                    AddTrackingButtons(result.Text);
                     if (result.Note != null) AddProblem(result.Note);
                 }
             }
@@ -1315,6 +1316,31 @@ namespace PdfReaderApp
             };
             chatPanel.Children.Add(box);
             return box;
+        }
+
+        // Tracking numbers in an answer get a button that opens the carrier's tracking page. Only numbers
+        // that pass the carrier's check digit count, so a number the AI misread doesn't get a button.
+        void AddTrackingButtons(string answer)
+        {
+            var seen = new HashSet<string>();
+            foreach (TrackingNumber t in Tracking.Find(answer))
+            {
+                if (!seen.Add(t.Number)) continue;
+                var row = new StackPanel { Orientation = Orientation.Horizontal };
+                row.Children.Add(new TextBlock { Text = "\uE8A7", FontFamily = (FontFamily)FindResource("Icons"), FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0) });
+                row.Children.Add(new TextBlock { Text = "Track " + t.Number + " on " + t.Carrier, FontSize = 12.5, FontWeight = FontWeights.SemiBold });
+                var button = new Button
+                {
+                    Style = (Style)FindResource("AccentBtn"),
+                    Content = row,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 0, 0, 6),
+                    ToolTip = "Opens " + new Uri(t.Url).Host + " in your browser",
+                };
+                string url = t.Url;
+                button.Click += delegate { OpenLink(url); };
+                chatPanel.Children.Add(button);
+            }
         }
 
         void AddProblem(string text)
